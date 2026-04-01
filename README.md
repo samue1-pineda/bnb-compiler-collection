@@ -4,3 +4,5 @@ bnb was born as my final project for "compilers" asignature of the major softwar
 
 future of bnb 
 this repository some day is going to get refactored, modularized but, it will keep on python as the first iteration of the bnb compiler 
+
+to test go to "prueba.bnb" and run the command on a CLI
