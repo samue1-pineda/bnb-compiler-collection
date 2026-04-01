@@ -1,0 +1,9 @@
+//python bnb_compile_collect.py
+
+a=5;
+b=6;
+c=a+b;
+v=4*5+a-6+c;
+
+print(f"resultado {v}");
+print(f"resultado {c}");
