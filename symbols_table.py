@@ -36,7 +36,6 @@ class SymbolTable:
     def exit_scope(self):
         """Sale del scope actual."""
         if self.current_scope_level > 0:
-            self.scoped_symbols.pop()
             self.current_scope_level -= 1
         else:
             print("Advertencia: Intento de salir del scope global.")
@@ -54,7 +53,6 @@ class SymbolTable:
 
     def lookup(self, name: str) -> Optional[Symbol]:
         """Busca un símbolo desde el scope actual hacia afuera (global)."""
-        
         for i in range(self.current_scope_level, -1, -1):
             scope = self.scoped_symbols[i]
             if name in scope:

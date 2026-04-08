@@ -1,7 +1,5 @@
-
-from enum import Enum, auto
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, Tuple, Union
+from typing import List, Optional
 from lexer_2 import Token, token_Type 
 from symbols_table import SymbolTable, SymbolType
 
@@ -11,6 +9,16 @@ class ASTNode:
 @dataclass
 class ProgramNode(ASTNode):
     statements: List[ASTNode] = field(default_factory=list)
+
+@dataclass
+class IfNode(ASTNode):
+    condition: ASTNode
+    then_branch: ASTNode
+    else_branch: Optional[ASTNode] = None
+
+class ReturnNode(ASTNode):
+    expression: ASTNode
+
 
 @dataclass
 class BinaryOpNode(ASTNode):
@@ -130,11 +138,16 @@ class PushdownParser:
                 return self.parse_print_statement()
             elif token_stat.value == 'fun':
                 return self.parse_function_definition()
+            elif token_stat.value == 'if':
+                return self.parse_if_statement()
+            elif token_stat.value == 'return':
+                return self.parse_return_statement()
+                    
             else:
                  self.error(f"Palabra clave inesperada '{token_stat.value}' al inicio de una sentencia")
         elif token_stat.type == token_Type.TOK_LEFT_BRACE:
             return self.parse_block_statement()
-        
+
         elif token_stat.type == token_Type.IDENTIFIER and \
              self.pos + 1 < len(self.tokens) and \
              self.tokens[self.pos+1].type == token_Type.TOK_EQUAL:
@@ -167,7 +180,24 @@ class PushdownParser:
         self.symbol_table.exit_scope()
         self.eat(token_Type.TOK_RIGHT_BRACE)
         return BlockNode(statements=statements)
-
+    
+    def parse_if_statement(self) -> IfNode:
+        self.eat(token_Type.KEYWORD)  # consume 'if'
+        condition = self.parse_expression()  # parsea la condición (que usa operadores de comparación)
+        then_branch = self.parse_block_statement()  # parsea el bloque
+        self.eat(token_Type.TOK_SEMICOMMA)
+        else_branch = None
+        if self.current_token and self.current_token.value == "else":
+            self.eat(token_Type.KEYWORD)  # consume 'else'
+            else_branch = self.parse_block_statement()
+        
+        return IfNode(condition, then_branch, else_branch)
+    def parse_return_statement(self) -> ReturnNode:
+        self.eat(token_Type.KEYWORD)
+        expr = self.parse_expression()
+        self.eat(token_Type.TOK_SEMICOMMA)
+        return ReturnNode(expression=expr)
+    
     def parse_function_definition(self) -> FunctionDefNode:
         func_token = self.eat(token_Type.KEYWORD) # 'fun'
         name_token = self.eat(token_Type.IDENTIFIER)
@@ -200,7 +230,7 @@ class PushdownParser:
         
         
         body_block_node = self._parse_block_content_for_func()
-
+        self.eat(token_Type.TOK_SEMICOMMA)
 
         self.symbol_table.exit_scope() 
 
@@ -238,6 +268,19 @@ class PushdownParser:
         return AssignmentNode(variable_name=var_name, variable_token=var_token, expression=expr)
 
     def parse_expression(self) -> ASTNode: 
+        return self.parse_comparison()
+    def parse_comparison(self) -> ASTNode:
+        node = self.parse_addition()
+        while self.current_token and self.current_token.type in (
+            token_Type.TOK_GREAT_EQUAL, token_Type.TOK_LESS_EQUAL,
+            token_Type.TOK_EQUAL_EQUAL, token_Type.TOK_GREAT, token_Type.TOK_LESS
+        ):
+            op_token = self.current_token
+            self.eat(op_token.type)
+            right_node = self.parse_addition()
+            node = BinaryOpNode(left=node, op=op_token, right=right_node)
+        return node
+    def parse_addition(self) -> ASTNode:  # ← NUEVO MÉTODO
         node = self.parse_term()
         while self.current_token and self.current_token.type in (token_Type.TOK_PLUS, token_Type.TOK_MINUS):
             op_token = self.current_token
@@ -254,7 +297,6 @@ class PushdownParser:
             right_node = self.parse_factor()
             node = BinaryOpNode(left=node, op=op_token, right=right_node)
         return node
-
     def parse_factor(self) -> ASTNode: 
         token_fact = self.current_token
         if not token_fact: self.error("Factor inesperado: fin de archivo.")
@@ -277,17 +319,15 @@ class PushdownParser:
         elif token_atom.type == token_Type.STRING: 
             self.eat(token_Type.STRING)
             return STRNode(token=token_atom)
+        
         elif token_atom.type == token_Type.TOK_F_STRING: 
             self.eat(token_Type.TOK_F_STRING)
             return FStringNode(original_token=token_atom)
+        
         elif token_atom.type == token_Type.IDENTIFIER:
-          
             self.eat(token_Type.IDENTIFIER)
-            symbol = self.symbol_table.lookup(token_atom.value)
-            if not symbol: 
-                 self.error(f"Símbolo '{token_atom.value}' no definido.", token_atom)
-            
             return VariableNode(name=token_atom.value, token=token_atom)
+        
         elif token_atom.type == token_Type.TOK_LEFT_PAREN:
             self.eat(token_Type.TOK_LEFT_PAREN)
             expr_node = self.parse_expression()

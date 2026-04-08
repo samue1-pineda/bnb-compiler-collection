@@ -1,7 +1,5 @@
 from enum import Enum, auto
 from dataclasses import dataclass
-from typing import List, Optional#FIXME
-
 class token_Type(Enum):
     NUM = auto()
     TOK_PLUS = auto()  # +
@@ -15,8 +13,12 @@ class token_Type(Enum):
     TOK_RIGHT_PAREN = auto()  # )
     TOK_RIGHT_BRACE=auto()# }
     TOK_LEFT_BRACE=auto()#{
-    
-
+    TOK_GREAT_EQUAL = auto()      # >=
+    TOK_LESS_EQUAL = auto()      # <=
+    TOK_GREAT = auto()      # >
+    TOK_LESS = auto()      # <
+    TOK_EQUAL_EQUAL = auto()   # ==
+    TOK_RETURN = auto()  # return
 
     IDENTIFIER = auto()  # literals o variables o funciones
 
@@ -42,11 +44,24 @@ class Lexer:
         self.Col = 1 #COLUMNA
         self.current_char = self.text[0] if text else None
         self.keywords = {
-        'print': token_Type.KEYWORD,
-        'fun':token_Type.KEYWORD,
-        'if':token_Type.KEYWORD
-        } #def palabras claves
+            'print': token_Type.KEYWORD,
+            'fun': token_Type.KEYWORD,
+            'if': token_Type.KEYWORD,
+            'else': token_Type.KEYWORD,
+            'return': token_Type.KEYWORD
+        }
         
+        self.single_char_tokens = {
+            '{': token_Type.TOK_LEFT_BRACE,
+            '}': token_Type.TOK_RIGHT_BRACE,
+            '+': token_Type.TOK_PLUS,
+            '-': token_Type.TOK_MINUS,
+            '*': token_Type.TOK_MULT,
+            '(': token_Type.TOK_LEFT_PAREN,
+            ')': token_Type.TOK_RIGHT_PAREN,
+            ';': token_Type.TOK_SEMICOMMA,
+            ',': token_Type.TOK_COMMA
+        }
     def advance(self):
         #avanza linea y columna como hace vscode
         if self.current_char == '\n':
@@ -149,68 +164,72 @@ class Lexer:
             self.advance()
         token_type = self.keywords.get(result, token_Type.IDENTIFIER)  # si no es una palabra clave, se considera un IDENTIFIER
         return Token(token_type, result, start_ln, start_col)  # retorna el token
+    
+    def handle_operators(self):#tomado de miau-compiler-collection V1
+        """Maneja operadores que pueden ser dobles (>=, ==, <=)"""
+        char = self.current_char
+        start_col = self.Col
+        self.advance()
         
+        if char == '>' and self.current_char == '=':
+            self.advance()
+            return Token(token_Type.TOK_GREAT_EQUAL, '>=', self.Ln, start_col)
+        elif char == '>' : return Token(token_Type.TOK_GREAT, '>', self.Ln, start_col)
+        
+        
+        if char == '=' and self.current_char == '=':
+            self.advance()
+            return Token(token_Type.TOK_EQUAL_EQUAL, '==', self.Ln, start_col)
+        elif char == '=' : return Token(token_Type.TOK_EQUAL, '=', self.Ln, start_col)
+        
+       
+        if char == '<' and self.current_char == '=':
+            self.advance()
+            return Token(token_Type.TOK_LESS_EQUAL, '<=', self.Ln, start_col)
+        elif char == '<' : return Token(token_Type.TOK_LESS, '<', self.Ln, start_col)
+        
+        return None
+    
     def get_next_tok(self):
         while self.current_char is not None:
             if self.current_char.isspace():
-                self.skip_white()  
-                if self.current_char is None:
-                    break  
+                self.skip_white()
                 continue
+            if self.current_char in '><=!':
+                return self.handle_operators()
 
-            if self.current_char=='/' and self.peek() == '/': #comentarios
-                if self.skip_comment():
-                    if self.current_char is None:
-                        break
-                    continue
-            if self.current_char == 'f' and self.peek() == '"':  # f-string
-                start_ln_f_val = self.Ln
-                start_col_f_val = self.Col
-                self.advance() 
-                return self.f_STRING(start_ln_f_val, start_col_f_val)
-            
+            if self.current_char in self.single_char_tokens:
+                token_type = self.single_char_tokens[self.current_char]
+                token = Token(token_type, self.current_char, self.Ln, self.Col)
+                self.advance()
+                return token
 
-            if self.current_char.isalpha() or self.current_char == '_':#si no es comentario es un literal o variable
+            if self.current_char.isalpha() or self.current_char == '_':
+
+                if self.current_char == 'f' and self.peek() == '"':
+                    start_ln = self.Ln
+                    start_col = self.Col
+                    self.advance()  # consume 'f'
+                    return self.f_STRING(start_ln, start_col)
                 return self.IDENTIFIER()
-            
+            if self.current_char.isdigit():
+                return self.Num()
             if self.current_char == '"':
                 return self.STR()
             
-            if self.current_char.isdigit():
-                return self.Num()
-            
-            if self.current_char=='/'and self.peek() != '/':
-                token=Token(token_Type.TOK_DIV,'/',self.Ln,self.Col)#implementacion para la division teniendo en cuenta que
-                #los comentarios al igual que las divisiones usan /
-                tok=Token(token_Type.TOK_DIV,'/',self.Ln,self.Col)
-                self.advance()
-                return tok
-            
-            single_char_TOK={
-                '=': token_Type.TOK_EQUAL, 
-                '{': token_Type.TOK_LEFT_BRACE,
-                '}': token_Type.TOK_RIGHT_BRACE, 
-                '+': token_Type.TOK_PLUS,
-                '-': token_Type.TOK_MINUS, 
-                '*': token_Type.TOK_MULT,
-                '(': token_Type.TOK_LEFT_PAREN, 
-                ')': token_Type.TOK_RIGHT_PAREN,
-                ';': token_Type.TOK_SEMICOMMA, 
-                ',': token_Type.TOK_COMMA
-            }
-            if self.current_char in single_char_TOK:
-                token_Type_val=single_char_TOK[self.current_char]
-                char_value=self.current_char
-                start_Ln=self.Ln
-                start_Col=self.Col
-                self.advance()
-                return Token(token_Type_val,char_value,start_Ln,start_Col)
-
-            
-            raise Exception(f"caracter desconocido/no integrado: '{self.current_char}' en linea:{self.Ln} columna:{self.Col}")
-            
-        return Token(token_Type.EOF, '', self.Ln, self.Col)
         
+            if self.current_char == '/':
+                if self.peek() == '/':
+                    self.skip_comment()
+                    continue
+                token = Token(token_Type.TOK_DIV, '/', self.Ln, self.Col)
+                self.advance()
+                return token
+
+            raise Exception(f"Carácter desconocido: {self.current_char}")
+
+        return Token(token_Type.EOF, '', self.Ln, self.Col)
+
     def tokenize(self):
         tokens_raw_list = []
         while True:
@@ -218,33 +237,13 @@ class Lexer:
             tokens_raw_list.append(token)
             if token.type == token_Type.EOF:
                 break
-                
-       
-        tokens_procesadosList:list[Token] = []
-        i = 0
-        #multiplicacion implicita
-        while i < len(tokens_raw_list):
-            current = tokens_raw_list[i]
-            tokens_procesadosList.append(current)
-
-            if current.type==token_Type.EOF:
-                break
-
-            if i + 1 < len(tokens_raw_list):
-                next_token = tokens_raw_list[i + 1]
-                if next_token.type!=token_Type.EOF:
-                    is_current_factor_end = current.type in (token_Type.NUM, token_Type.IDENTIFIER, token_Type.TOK_RIGHT_PAREN)
-                if is_current_factor_end and next_token.type == token_Type.TOK_LEFT_PAREN:  
-                    col_mult=current.col+len(str(current.value))
-                    mult_token=Token(token_Type.TOK_MULT,'*',current.ln,col_mult)
-                    tokens_procesadosList.append(mult_token)
-                    #Multiplicación implícita end         
-            i += 1
-
+        
+        # Sin multiplicación implícita por ahora
+        # Solo copiar y asegurar que termine con EOF
+        tokens_procesadosList = tokens_raw_list
+        
         if not tokens_procesadosList or tokens_procesadosList[-1].type != token_Type.EOF:
             eof_token_to_add = Token(token_Type.EOF, '', self.Ln, self.Col)
-            if tokens_raw_list and tokens_raw_list[-1].type==token_Type.EOF:
-                eof_token_to_add=tokens_raw_list[-1]
-            if not tokens_procesadosList or tokens_procesadosList[-1].type != token_Type.EOF:
-                tokens_procesadosList.append(eof_token_to_add)
+            tokens_procesadosList.append(eof_token_to_add)
+        
         return tokens_procesadosList

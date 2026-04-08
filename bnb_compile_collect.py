@@ -41,6 +41,11 @@ def compilar_a_bnb(archivo_entrada: str, nombre_base_salida: str):
 
         lexer = Lexer(codigo_fuente)
         tokens = lexer.tokenize()
+        """
+        print(f"DEBUG: Tokens generados: {len(tokens)}")  
+        for i, tok in enumerate(tokens[:10]):  # Muestra los primeros 10
+            print(f"  Token {i}: {tok.type.name} = '{tok.value}'")
+        """
         print("Análisis léxico completado.")
 
         symbol_table = SymbolTable()

@@ -1,11 +1,14 @@
 from anilizador_sintactico import (
     ASTNode, ProgramNode, BinaryOpNode, NumberNode, UnaryOpNode, 
     STRNode, FStringNode, printNode, VariableNode, AssignmentNode, 
-    BlockNode, FunctionDefNode, token_Type 
+    BlockNode, FunctionDefNode,IfNode,ReturnNode, token_Type
 )
 from symbols_table import SymbolTable, SymbolType 
 from typing import List, Any, Union, Dict
 import re 
+#TODO documentar, solo dios recuerda que hacia toda esta barbaridad
+#Dias sin documentar: 1
+#inicio 08/04/26
 
 class CodeGenerator:
     def __init__(self, symbol_table: SymbolTable):
@@ -132,7 +135,31 @@ class CodeGenerator:
             raise NameError(f"CodeGen: Variable '{node.name}' no definida al usarla.")
         self.add_instruction(f"LOAD {node.name}")
         return self._get_simulated_variable(node.name)
+    def visit_IfNode(self, node: IfNode):
+        label_id = self.label_count
+        self.label_count += 1
+        
+        label_else = f"ELSE_{label_id}"
+        label_end = f"END_IF_{label_id}"
+        self.visit(node.condition)
+    
 
+        self.add_instruction(f"JZ {label_else} ; Saltar si es falso")
+        
+
+        self.visit(node.then_branch)
+        self.add_instruction(f"JMP {label_end}")
+        
+        # 4. Rama Falsa
+        self.add_instruction(f"{label_else}:")
+        if node.else_branch:
+            self.visit(node.else_branch)
+        
+        self.add_instruction(f"{label_end}:")
+
+    def visit_ReturnNode(self, node: ReturnNode):
+        self.visit(node.expression)
+        self.add_instruction("RET ; Devolver valor en el tope de la pila")
     def visit_AssignmentNode(self, node: AssignmentNode):
         expr_value_sim = self.visit(node.expression) 
         
@@ -156,24 +183,53 @@ class CodeGenerator:
         
         op_type = node.op.type
         
-        if op_type == token_Type.TOK_PLUS: self.add_instruction("ADD")
-        elif op_type == token_Type.TOK_MINUS: self.add_instruction("SUB")
-        elif op_type == token_Type.TOK_MULT: self.add_instruction("MUL")
-        elif op_type == token_Type.TOK_DIV: self.add_instruction("DIV")
-        else: raise NotImplementedError(f"CodeGen: Operador binario {node.op.type.name} no soportado.")
+        if op_type == token_Type.TOK_PLUS: 
+            self.add_instruction("ADD")
+        elif op_type == token_Type.TOK_MINUS: 
+            self.add_instruction("SUB")
+        elif op_type == token_Type.TOK_MULT: 
+            self.add_instruction("MUL")
+        elif op_type == token_Type.TOK_DIV: 
+            self.add_instruction("DIV")
+        elif op_type == token_Type.TOK_GREAT_EQUAL: 
+            self.add_instruction("GE")
+        elif op_type == token_Type.TOK_LESS_EQUAL: 
+            self.add_instruction("LE")
+        elif op_type == token_Type.TOK_EQUAL_EQUAL: 
+            self.add_instruction("EQ")
+        elif op_type == token_Type.TOK_GREAT: 
+            self.add_instruction("GT")
+        elif op_type == token_Type.TOK_LESS: 
+            self.add_instruction("LT")
+        else: 
+            raise NotImplementedError(f"CodeGen: Operador binario {node.op.type.name} no soportado.")
 
-        
+        # Simulación
         if isinstance(left_val_sim, (int, float)) and isinstance(right_val_sim, (int, float)):
-            if op_type == token_Type.TOK_PLUS: return left_val_sim + right_val_sim
-            elif op_type == token_Type.TOK_MINUS: return left_val_sim - right_val_sim
-            elif op_type == token_Type.TOK_MULT: return left_val_sim * right_val_sim
+            if op_type == token_Type.TOK_PLUS: 
+                return left_val_sim + right_val_sim
+            elif op_type == token_Type.TOK_MINUS: 
+                return left_val_sim - right_val_sim
+            elif op_type == token_Type.TOK_MULT: 
+                return left_val_sim * right_val_sim
             elif op_type == token_Type.TOK_DIV:
                 if right_val_sim == 0:
-                    print("[SIMULACIÓN ERROR]: División por cero.")
+                    print("[ERR]: División por cero.")
                     return None
                 return left_val_sim / right_val_sim
+            elif op_type == token_Type.TOK_GREAT_EQUAL: 
+                return 1 if left_val_sim >= right_val_sim else 0
+            elif op_type == token_Type.TOK_LESS_EQUAL: 
+                return 1 if left_val_sim <= right_val_sim else 0
+            elif op_type == token_Type.TOK_EQUAL_EQUAL: 
+                return 1 if left_val_sim == right_val_sim else 0
+            elif op_type == token_Type.TOK_GREAT: 
+                return 1 if left_val_sim > right_val_sim else 0
+            elif op_type == token_Type.TOK_LESS: 
+                return 1 if left_val_sim < right_val_sim else 0
+            
         return None
-
+    
     def visit_UnaryOpNode(self, node: UnaryOpNode) -> Union[float, None]:
         expr_val_sim = self.visit(node.expr)
         op_type = node.op.type

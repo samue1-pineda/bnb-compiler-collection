@@ -1,10 +1,17 @@
 //how to run: python bnb_compile_collect.py prueba.bnb
-//
 
 a=5;
 b=6;
 c=a+b;
 v=4*5+a-6+c;
-print("hola mundo!")
+print("hola mundo!");
 print(f"resultado {v}");
 print(f"resultado {c}");
+
+if v>=3 {
+    print("HOLA");
+};
+
+fun suma(a,b){
+    print(f"resultado{a+b}");
+};
