@@ -10,4 +10,6 @@ this repository some day is going to get refactored, modularized but, it will ke
 to test go to "prueba.bnb" and run the command on a CLI
 
 # BNB status
-frozen, some bugs (on functions) to fix created from a implementation
+- frozen
+- some bugs (on functions) to fix created from a implementation
+- bnb is going to get deprecated and the c/c++ version is Katalyx(currently on private)
